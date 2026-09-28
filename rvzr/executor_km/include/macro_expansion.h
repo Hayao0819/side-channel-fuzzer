@@ -92,7 +92,8 @@ extern macro_descr_t macro_descriptors[];
 // =================================================================================================
 // Constants for parsing macro bodies
 // =================================================================================================
-// Code tokens
+// Code tokens: arbitrary 8-byte patterns located by a byte-wise scan in macro_expansion.c;
+// same constraints as the TEMPLATE_* markers in <arch>/entry_exit_points.h
 #define MACRO_START              0x0fff379000000000
 #define MACRO_END                0x0fff2f9000000000
 #define MACRO_START_TOKEN_LENGTH 8

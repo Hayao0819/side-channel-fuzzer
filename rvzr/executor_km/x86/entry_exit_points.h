@@ -19,9 +19,13 @@
 #include "sandbox_manager.h"
 #include "shortcuts.h"
 
+// Template markers: arbitrary 8-byte patterns embedded via `.quad` and located
+// by a byte-wise scan in code_loader.c. Any values work as long as they are mutually distinct,
+// are TEMPLATE_MARKER_SIZE bytes long, and are not valid opcodes for the architecture
+// (here, the byte at offset 5 is AAA/DAS/AAS/DAA, all invalid in 64-bit mode).
 #define TEMPLATE_START                     0x0fff379000000000
 #define TEMPLATE_INSERT_TC                 0x0fff2f9000000000
-#define TEMPLATE_DEFAULT_EXCEPTION_LANDING 0x0fff479000000000
+#define TEMPLATE_DEFAULT_EXCEPTION_LANDING 0x0fff3f9000000000
 #define TEMPLATE_END                       0x0fff279000000000
 #define TEMPLATE_MARKER_SIZE               8
 

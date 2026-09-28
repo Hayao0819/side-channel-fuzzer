@@ -13,6 +13,11 @@
 
 #include "asm_snippets.h"
 
+// Template markers: arbitrary 8-byte patterns embedded via `.quad` and located
+// by a byte-wise scan in code_loader.c. Any values work as long as they are mutually distinct,
+// are TEMPLATE_MARKER_SIZE bytes long, and are not valid opcodes for the architecture
+// (here, each 0x0000XXXX word decodes as `udf #0xXXXX`).
+// TEMPLATE_DEFAULT_EXCEPTION_LANDING is followed by a nop to fill MACRO_PLACEHOLDER_SIZE (12).
 #define TEMPLATE_START                     0x0000111100001111
 #define TEMPLATE_INSERT_TC                 0x0000222200002222
 #define TEMPLATE_DEFAULT_EXCEPTION_LANDING 0x0000333300003333
