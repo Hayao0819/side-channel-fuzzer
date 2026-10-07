@@ -52,4 +52,8 @@ extern int (*set_memory_nx)(unsigned long, int);
 
 extern cpuinfo_t *cpuinfo; // cached result of cpu_data for CPU 0
 
+#if defined(ARCH_X86_64)
+bool is_intel_goldmont_class(void);
+#endif
+
 #endif // _RVZR_EXECUTOR_MAIN_H_

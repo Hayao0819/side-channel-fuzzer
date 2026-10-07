@@ -82,16 +82,30 @@ int load_sandbox_data(int input_id)
                  "movq 0x20(%0), %%mm4\n"
                  "movq 0x28(%0), %%mm5\n"
                  "movq 0x30(%0), %%mm6\n"
-                 "movq 0x38(%0), %%mm7\n"
-                 // Note: overlap between YMM and MMX init values is intentional
-                 "vmovdqa 0x00(%0), %%ymm0\n"
-                 "vmovdqa 0x20(%0), %%ymm1\n"
-                 "vmovdqa 0x40(%0), %%ymm2\n"
-                 "vmovdqa 0x60(%0), %%ymm3\n"
-                 "vmovdqa 0x80(%0), %%ymm4\n"
-                 "vmovdqa 0xa0(%0), %%ymm5\n"
-                 "vmovdqa 0xc0(%0), %%ymm6\n"
-                 "vmovdqa 0xe0(%0), %%ymm7\n" ::"r"(&simd_src[0]));
+                 "movq 0x38(%0), %%mm7\n" ::"r"(&simd_src[0]));
+    // Note: overlap between vector and MMX init values is intentional.
+    // Goldmont-class Atom has no AVX; fall back to SSE2 xmm (low 128 bits).
+    if (cpu_has(cpuinfo, X86_FEATURE_AVX)) {
+        asm volatile(""
+                     "vmovdqa 0x00(%0), %%ymm0\n"
+                     "vmovdqa 0x20(%0), %%ymm1\n"
+                     "vmovdqa 0x40(%0), %%ymm2\n"
+                     "vmovdqa 0x60(%0), %%ymm3\n"
+                     "vmovdqa 0x80(%0), %%ymm4\n"
+                     "vmovdqa 0xa0(%0), %%ymm5\n"
+                     "vmovdqa 0xc0(%0), %%ymm6\n"
+                     "vmovdqa 0xe0(%0), %%ymm7\n" ::"r"(&simd_src[0]));
+    } else {
+        asm volatile(""
+                     "movdqa 0x00(%0), %%xmm0\n"
+                     "movdqa 0x20(%0), %%xmm1\n"
+                     "movdqa 0x40(%0), %%xmm2\n"
+                     "movdqa 0x60(%0), %%xmm3\n"
+                     "movdqa 0x80(%0), %%xmm4\n"
+                     "movdqa 0xa0(%0), %%xmm5\n"
+                     "movdqa 0xc0(%0), %%xmm6\n"
+                     "movdqa 0xe0(%0), %%xmm7\n" ::"r"(&simd_src[0]));
+    }
 #endif
 
     return 0;

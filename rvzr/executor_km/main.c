@@ -621,6 +621,23 @@ static inline cpuinfo_t *get_cpuinfo(void)
 #endif
 }
 
+#if defined(ARCH_X86_64)
+bool is_intel_goldmont_class(void)
+{
+    if (cpuinfo->x86_vendor != X86_VENDOR_INTEL)
+        return false;
+
+    switch (cpuinfo->x86_model) {
+    case 0x5c: // Goldmont
+    case 0x5f: // Goldmont D
+    case 0x7a: // Goldmont Plus
+        return true;
+    default:
+        return false;
+    }
+}
+#endif
+
 /// @brief Check if the CPU supports the required features
 /// @param void
 /// @return 0 on success, -1 on failure
@@ -633,9 +650,17 @@ static int check_cpu_compat(void)
         return -1;
     }
 
-    // Check that the CPU supports the required features
-    if (!cpu_has(cpuinfo, X86_FEATURE_AVX) || !cpu_has(cpuinfo, X86_FEATURE_MMX)) {
-        printk(KERN_ERR "ERROR: rvzr_executor: Executor KM requires AVX\n");
+    // Check that the CPU supports the required baseline features
+    if (!cpu_has(cpuinfo, X86_FEATURE_XMM2) || !cpu_has(cpuinfo, X86_FEATURE_MMX)) {
+        printk(KERN_ERR "ERROR: rvzr_executor: Executor KM requires SSE2 and MMX\n");
+        return -1;
+    }
+
+    // Only the Goldmont family is supported without AVX. Its model-specific PMU and MSR
+    // configuration is handled explicitly by the executor.
+    if (!cpu_has(cpuinfo, X86_FEATURE_AVX) && !is_intel_goldmont_class()) {
+        printk(KERN_ERR "ERROR: rvzr_executor: AVX-less execution is supported only on "
+                        "Goldmont-class Intel Atom CPUs\n");
         return -1;
     }
 

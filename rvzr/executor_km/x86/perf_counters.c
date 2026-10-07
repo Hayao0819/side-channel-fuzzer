@@ -35,6 +35,7 @@ static int get_pfc_config_by_name(pfc_name_e pfc_name, struct pfc_config *config
 {
     uint64_t family = cpuinfo->x86;
     uint64_t model = cpuinfo->x86_model;
+    bool is_goldmont = is_intel_goldmont_class();
 
     // most commonly, the fields cmask, any, edge, and inv are set to 0
     config->cmask = 0;
@@ -58,23 +59,37 @@ static int get_pfc_config_by_name(pfc_name_e pfc_name, struct pfc_config *config
             if (model == 0xBA || model == 0xB7 || model == 0xBF || model == 0x97 || model == 0x9A) {
                 config->evt_num = 0xAE;
                 config->umask = 0x01;
+            } else if (is_goldmont) {
+                config->evt_num = 0x0E;
+                config->umask = 0x00;
             } else {
                 config->evt_num = 0x0E;
                 config->umask = 0x01;
             }
             break;
         case UOPS_RETIRED_ANY:
-            //   UOPS_RETIRED.RETIRE_SLOTS: Counts the retirement slots used.
             config->evt_num = 0xC2;
-            config->umask = 0x02;
+            if (is_goldmont) {
+                // UOPS_RETIRED.ANY: Counts uops retired.
+                config->umask = 0x00;
+            } else {
+                // UOPS_RETIRED.RETIRE_SLOTS: Counts the retirement slots used.
+                config->umask = 0x02;
+            }
             break;
         case MISPREDICTION_RECOVERY_CYCLES:
-            //   INT_MISC.CLEAR_RESTEER_CYCLES: Cycles the issue-stage is waiting for front-end to
-            //   fetch from resteered path following branch misprediction or machine clear events.
-            if (model == 0xBA || model == 0xB7 || model == 0xBF || model == 0x97 || model == 0x9A) {
+            if (is_goldmont) {
+                // ISSUE_SLOTS_NOT_CONSUMED.RECOVERY: Unfilled issue slots while recovering from
+                // branch mispredictions or machine clears.
+                config->evt_num = 0xCA;
+                config->umask = 0x02;
+            } else if (model == 0xBA || model == 0xB7 || model == 0xBF || model == 0x97 ||
+                       model == 0x9A) {
+                // INT_MISC.CLEAR_RESTEER_CYCLES: Cycles waiting for the resteered path.
                 config->evt_num = 0xAD;
                 config->umask = 0x80;
             } else {
+                // INT_MISC.RECOVERY_CYCLES: Cycles spent recovering from misprediction or clears.
                 config->evt_num = 0x0D;
                 config->umask = 0x01;
             }
@@ -224,8 +239,8 @@ int pfc_configure(void)
     err |= pfc_write(3, &config, 1, 1);
     CHECK_ERR("pfc_configure");
 
-    // #4: Interrupt detection
-    if (cpuinfo->x86_vendor == X86_VENDOR_INTEL) {
+    // #4: Interrupt detection. Goldmont-class CPUs expose only counters 0-3.
+    if (cpuinfo->x86_vendor == X86_VENDOR_INTEL && !is_intel_goldmont_class()) {
         err |= get_pfc_config_by_name(HW_INTERRUPTS_RECEIVED, &config);
         CHECK_ERR("pfc_configure");
         err |= pfc_write(4, &config, 1, 1);
