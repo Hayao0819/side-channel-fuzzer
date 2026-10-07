@@ -146,6 +146,13 @@ static int get_prefetcher_msr_ctrls(uint64_t *msr_id, uint64_t *msr_mask)
         case 0xbf:
             *msr_mask = 0b101111;
             break;
+        case 0x5c: // Goldmont
+        case 0x5f: // Goldmont D
+        case 0x7a: // Goldmont Plus
+            // Only L2-HW (bit0) and DCU (bit2) prefetchers are controllable here;
+            // bits 1/3 are reserved and #GP on write.
+            *msr_mask = 0b0101;
+            break;
         default:
             *msr_mask = 0b1111;
             break;
@@ -196,15 +203,17 @@ int set_special_registers(void)
 #ifndef VMBUILD
     // Speculative Store Bypass (SSBP) patch
     err = get_ssbp_patch_msr_ctrls(&msr_id, &msr_mask);
-    orig_special_registers_state->spec_ctrl = rdmsr64(msr_id);
     CHECK_ERR("set_enable_ssbp_patch");
+    orig_special_registers_state->spec_ctrl = rdmsr64(msr_id);
+    orig_special_registers_state->spec_ctrl_valid = true;
     err = apply_msr_mask(msr_id, msr_mask, enable_ssbp_patch);
     CHECK_ERR("set_enable_ssbp_patch");
 
     // Prefetcher control
     err = get_prefetcher_msr_ctrls(&msr_id, &msr_mask);
-    orig_special_registers_state->prefetcher_ctrl = rdmsr64(msr_id);
     CHECK_ERR("set_disable_prefetchers");
+    orig_special_registers_state->prefetcher_ctrl = rdmsr64(msr_id);
+    orig_special_registers_state->prefetcher_ctrl_valid = true;
     err = apply_msr_mask(msr_id, msr_mask, !enable_prefetchers); // the mask is
     CHECK_ERR("set_disable_prefetchers");
 #endif
@@ -260,8 +269,8 @@ void restore_special_registers(void)
 {
     uint64_t msr_id = 0, msr_mask = 0;
 
-    // note: the if-zero statements are necessary because the MSR initialization might have failed
-    // midway through the process, in which case the MSR state was only partially initialized
+    // The zero checks guard state that might not have been initialized if setup failed midway.
+    // Optional controls use validity flags because zero is also a valid saved MSR value.
 
     if (orig_special_registers_state->cr0 != 0)
         _write_cr0(orig_special_registers_state->cr0);
@@ -275,13 +284,13 @@ void restore_special_registers(void)
     if (orig_special_registers_state->lstar != 0)
         wrmsr64(MSR_LSTAR, orig_special_registers_state->lstar);
 
-    if (orig_special_registers_state->spec_ctrl != 0) {
-        get_ssbp_patch_msr_ctrls(&msr_id, &msr_mask);
+    if (orig_special_registers_state->spec_ctrl_valid &&
+        get_ssbp_patch_msr_ctrls(&msr_id, &msr_mask) == 0) {
         wrmsr64(msr_id, orig_special_registers_state->spec_ctrl);
     }
 
-    if (orig_special_registers_state->prefetcher_ctrl != 0) {
-        get_prefetcher_msr_ctrls(&msr_id, &msr_mask);
+    if (orig_special_registers_state->prefetcher_ctrl_valid &&
+        get_prefetcher_msr_ctrls(&msr_id, &msr_mask) == 0) {
         wrmsr64(msr_id, orig_special_registers_state->prefetcher_ctrl);
     }
 
